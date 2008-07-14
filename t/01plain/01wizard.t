@@ -19,7 +19,7 @@ use strict;
 use warnings;
 use lib qw(t/01plain/lib);
 
-use Test::More tests => 19;
+use Test::More tests => 18;
 
 use Catalyst::Wizard;
 use Data::Dumper;
@@ -45,7 +45,6 @@ Catalyst::Wizard->new($c, $load_wizard);
 
 
 
-add_expected('TestApp::wizard_storage', 'noargs');
 my $new_wizard = Catalyst::Wizard->new($c, 'new');
 
 my $i = 0;
@@ -70,7 +69,7 @@ is_deeply( $new_wizard->_step,
     'step ok'
 );
 
-$new_wizard->_next_step;
+$new_wizard->next_step;
 $new_wizard->add_steps( -redirect => '/testmeanothertime' );
 
 is_deeply( $new_wizard->{steps}[1],
@@ -89,7 +88,7 @@ is_deeply( $new_wizard->_step,
 );
 
 
-$new_wizard->_next_step;
+$new_wizard->next_step;
 $new_wizard->add_steps( '/teeeest?testmeplease=ifeelmyself' );
 
 add_expected(
@@ -101,7 +100,11 @@ eval { $new_wizard->goto_next };
 $new_wizard->perform_step( $c );
 
 add_expected('TestApp::wizard_storage', 'noargs');
+$new_wizard->save( $c );
+
+
 $new_wizard = Catalyst::Wizard->new( $c, 'new' );
+$new_wizard->load( $c );
 
 $i = 0;
 $new_wizard->add_steps( -force => -detach => '/testmeplease' ) while($i++ < 2);
@@ -111,8 +114,9 @@ is( @{ $new_wizard->{steps} }, 2, 'adding duplicate actions on force' );
 is( ref $stash, 'HASH', 'wizard stash ok' );
 
 $c->stash->{wizard}{testme} = 10;
-$new_wizard->save($c);
 
+add_expected('TestApp::wizard_storage', 'noargs');
+$new_wizard->save($c);
 
 is_deeply( { testme => 10 }, 
     $wizards->{ $new_wizard->{wizard_id} }{stash}, 'stash is ok');
@@ -129,7 +133,6 @@ is( $new_wizard->{stash}{testme}, 20, 'stashed value for loaded from storage ok'
 my $detach_to = [ '/detachtest', { login => 'vasya', password => 'pupkin' } ];
 $new_wizard->add_steps( -detach => [ @$detach_to ] );
 
-add_expected('TestApp::wizard_storage', 'noargs');
 add_expected( 'TestApp::detach', $detach_to->[0], [ $detach_to->[1] ]);
 eval { $new_wizard->goto_next };
 $new_wizard->perform_step( $c );

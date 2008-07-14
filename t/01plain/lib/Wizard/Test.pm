@@ -22,6 +22,7 @@ use warnings;
 
 use Test::More;
 
+use Carp qw/cluck/;
 use Data::Dumper;
 our $label_lines = [];
 
@@ -76,6 +77,8 @@ sub check_expected {
     my $function = (caller(1))[3];
 
     my $expect = shift @expected;
+
+    Carp::cluck if $ENV{CHECK_EXPECTED_DEBUG};
 
     no warnings 'redefine';
     local $Test::Builder::Level = $Test::Builder::Level + 3;

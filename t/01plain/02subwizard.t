@@ -19,7 +19,7 @@ use strict;
 use warnings;
 use lib qw(t/01plain/lib);
 
-use Test::More tests => 9;
+use Test::More tests => 7;
 
 use Catalyst::Wizard;
 use Data::Dumper;
@@ -54,9 +54,10 @@ my $new_wizard = Catalyst::Wizard->new( $c );
 $new_wizard->add_steps('-sub' => [ '/testme' ], -redirect => '/pleasetestme' );
 
 add_expected('TestApp::wizard_storage', 
-    $c, $new_wizard->{wizard_id}, $new_wizard);
-add_expected('TestApp::wizard_storage', 'noargs') foreach 1..4;
+    $c, $new_wizard->{wizard_id}, $new_wizard); # in save of current wizard in _make_sub_wizard
+add_expected('TestApp::wizard_storage', 'noargs'); # in _current_wizard
 add_expected('PseudoCatalyst::Response::redirect', 'noargs');
+add_expected('TestApp::wizard_storage', 'noargs'); # save in _make_sub_wizard after ->perform_step
 eval { $new_wizard->goto_next };
 $new_wizard->perform_step( $c );
 

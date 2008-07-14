@@ -15,6 +15,14 @@
 #     REVISION:  ---
 #===============================================================================
 
+=head1 NAME
+
+Catalyst::Action::Wizard -- actions like realization of wizards. You need this
+if you have some multi-actions data gathering which unlikely to be saved
+in session and to big to pass them as POST or GET parameters.
+
+=cut
+
 package Catalyst::Action::Wizard;
 
 use strict;
@@ -93,7 +101,7 @@ sub execute {
 
     #warn "executing: $self";
 
-    unless ( $self->name =~ /^_/ ) {
+    if ( $self->name eq '_BEGIN' ) {
 	my $wizard_id = $c->can('wizard_id') ? $c->wizard_id 
 	    : exists $c->req->params->{wid}  ? $c->req->params->{wid}
 	    : ''
@@ -105,27 +113,22 @@ sub execute {
 	    ($wizard_id_without_step) = $wizard_id =~ /([0-9a-zA-Z]{32})/;
 	}
 
-	if ( $wizard_id && !$wizard_id_without_step ) {
-	    return $self->next::method( @_ );
+	#if ( $wizard_id && !$wizard_id_without_step ) {
+	#   return $self->next::method( @_ );
+	#}
+
+	#_check_wizard_is_changed( $c, $wizard_id_without_step );
+
+	if ( $wizard_id && $wizard_id_without_step ) {
+	    _new_wizard( $c, $wizard_id );
 	}
 
-	_check_wizard_is_changed( $c, $wizard_id_without_step );
-
-	my $wizard;
-
-	if ( ! ( $wizard = _current_wizard( $c ) ) ) {
-	    if ( $wizard_id ) {
-		$wizard = _new_wizard( $c, $wizard_id );
-	    }
-
-	}
-
-	$wizard->load( $c ) if $wizard;
+    } elsif ( not $self->name =~ /^_/ ) {
 
 	my @ret = eval { $self->next::method(@_) };
 
 	# can be created in action
-	$wizard ||= _current_wizard( $c );
+	my $wizard = _current_wizard( $c );
 
 	if ($wizard
 	    &&	
@@ -137,14 +140,18 @@ sub execute {
 		||  $wizard->{goto} 
 	    ) ) {
 
-	    $wizard->perform_step( $c );
 	    undef $@;
+	    $wizard->perform_step( $c );
 	}
 	elsif ( $@ ) {
 	    die $@;
 	}
 
 	return @ret;
+    } elsif ( $self->name eq '_END' ) {
+	if ( _current_wizard( $c ) ) {
+	    _current_wizard( $c )->save( $c );
+	}
     }
 
     $self->next::method(@_);

@@ -9,16 +9,19 @@ my $build = Module::Build->new(
         'Catalyst'                      => 0.57,
         'Catalyst::Plugin::Session'     => 0.19,
 	'HTTP::Message'			=> 1.57,
+	'Class::C3'			=> 0,
     },
     build_requires      => {
         'ok'						=>  0,
         'Test::More'					=>  0,
 	'Test::WWW::Mechanize::Catalyst'		=>  0,
 	'Catalyst::Plugin::Session::State::Cookie'	=>  0,
+	'Class::C3'					=>  0,
+	'HTTP::Message'					=>  5.812,
     },
     create_makefile_pl  => 'passthrough',
     dist_abstract       => 'Catalyst::Action::Wizard -- Catalyst module for building wizards',
-    dist_version	=> '0.001',
+    dist_version	=> '0.003',
     recursive_test_files=> 1,
 );
 

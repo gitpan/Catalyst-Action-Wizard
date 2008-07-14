@@ -1,6 +1,6 @@
 ---
 name: Catalyst-Action-Wizard
-version: 0.001
+version: 0.003
 author: []
 abstract: 'Catalyst::Action::Wizard -- Catalyst module for building wizards'
 license: perl
@@ -9,10 +9,13 @@ resources:
 requires:
   Catalyst: 0.57
   Catalyst::Plugin::Session: 0.19
+  Class::C3: 0
   HTTP::Message: 1.57
   perl: 5.006
 build_requires:
   Catalyst::Plugin::Session::State::Cookie: 0
+  Class::C3: 0
+  HTTP::Message: 5.812
   Test::More: 0
   Test::WWW::Mechanize::Catalyst: 0
   ok: 0

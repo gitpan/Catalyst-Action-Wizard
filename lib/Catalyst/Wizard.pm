@@ -355,14 +355,14 @@ sub _step {
 
     my $step = $self->{steps}[ $self->{step_number} ];
 
-    $self->_next_step($_[0] || 0);
+    $self->next_step($_[0] || 0);
 
     $step;
 }
 
 
 
-sub _next_step {
+sub next_step {
     my $self = shift;
     my $shift = shift;
 
@@ -499,25 +499,22 @@ sub back_to {
 
 sub perform_step {
     my $self	    = shift;
-    my ($c)   = @_;
+    my $c	    = shift;
 
     return unless delete $self->{goto};
 
     my $step = $self->_step;
 
-#    $self->info _dump($self, $step);
-
-    return unless $step;
-
     DEBUG && $self->info(_dump($step));
 
-    $self->save( $c );
+    return unless $step;
 
     if ( $step->{step_type} eq '-detach' or $step->{step_type} eq '-forward' ) {
 	my $step_type = $step->{step_type};
 	$step_type =~ s/^-//; #THATS NOT SMILE!
 
-	$self->_next_step;
+	$self->next_step;
+	
 	return $c->$step_type($step->{path}, $step->{args});
     }
 
@@ -531,6 +528,7 @@ sub perform_step {
 	}
     );
 
+    # dont call ->save, will be saved in Action::Wizard.
     $c->response->redirect($path);
 }
 
@@ -553,7 +551,7 @@ sub _make_sub_wizard {
     $new_wizard->add_steps( @{ $step->{args} } );
 
     # to the next step, for ->_step calling in ->last action
-    $self->_next_step;
+    $self->next_step;
     $new_wizard->add_steps(
 	-last => -redirect => $self->_get_full_path( $self->_step,
 	    { 
@@ -566,8 +564,9 @@ sub _make_sub_wizard {
     $new_wizard->{no_add_step} = $step->{fixed};
     $new_wizard->{stash}       = $self->{stash};
 
+    # remove our stash
     $self->save( $c );
-    $new_wizard->save( $c );
+    # replace with stash of new_wizard
     $new_wizard->load( $c );
 
     DEBUG && $self->info("setting wizard for ".$c->action. " ". refaddr( $c->action ));
@@ -584,6 +583,9 @@ new step id: $new_wizard->{wizard_id}");
     # in case it can die
     eval { $new_wizard->goto_next };
     $new_wizard->perform_step( $c );
+
+    # save us, if we reached this point
+    $new_wizard->save( $c );
 }
 
 #===  FUNCTION  ================================================================
@@ -652,7 +654,7 @@ sub check_step_number {
 	    ]->{step_type} eq '-redirect') {
 
 
-	return $self->_next_step;
+	return $self->next_step;
     }
 
     # back step is only for -redirect steps
@@ -717,7 +719,8 @@ sub load {
     my ( $self, $c ) = @_;
 
     # all ok, can replace wizard in stash
-    if ( not exists $c->stash->{wizard} ) {
+    if (    ! exists $c->stash->{wizard} 
+	||  ! keys %{ $c->stash->{wizard} } ) {
 	$c->stash->{wizard} = $self->{stash};
     }
     # user first userd stash->wizard and only then
@@ -730,8 +733,11 @@ sub load {
 	# use it as our own stash
 	$self->{stash} = $c->stash->{wizard};
     }
+    #else {
+    # no else -- we cant have both our and catalyst stash->{wizard}
+    # filled, because we ->load'ed in ->new
+    #}
 }
-
 
 
 sub save {
@@ -815,6 +821,9 @@ sub _current_wizard {
 }
 
 
+#---------------------------------------------------------------------------
+#  UTILITY FUNCTIONS
+#---------------------------------------------------------------------------
 
 sub _dump_self {
     my $self = shift;
