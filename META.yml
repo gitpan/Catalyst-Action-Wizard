@@ -1,6 +1,6 @@
 ---
 name: Catalyst-Action-Wizard
-version: 0.003
+version: 0.004
 author: []
 abstract: 'Catalyst::Action::Wizard -- Catalyst module for building wizards'
 license: perl

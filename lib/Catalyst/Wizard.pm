@@ -478,9 +478,11 @@ sub back_to {
 	$path = shift;
     }
 
+    DEBUG && $self->info( $path, $type );
+
     my $found_in_passed = do {
-	grep { $_->{path} eq $path } 
-	    reverse @{ $self->{steps} } [0..$self->{step_number} - 2];
+	grep { $_->{path} =~ m{^/?$path$} } 
+	    reverse @{ $self->{steps} } [0..$self->{step_number} - 1];
     };
 
     return unless $found_in_passed;
@@ -837,8 +839,13 @@ sub info {
 
     open my $fh, '>>', '/tmp/logfile';
 
+    my $caller_fun;
+    for( my $i = 1; $i == 1 || $caller_fun =~ /::(short_)?info$/; $i++ ) {
+	$caller_fun = (caller($i))[3];
+    }
+
     unshift @_, $self->_dump_self, " " if ref $self;
-    unshift @_, (caller(1))[3], " ";
+    unshift @_, $caller_fun, " ";
 
     print $fh @_, "\n";
     close $fh;

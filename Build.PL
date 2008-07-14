@@ -21,7 +21,7 @@ my $build = Module::Build->new(
     },
     create_makefile_pl  => 'passthrough',
     dist_abstract       => 'Catalyst::Action::Wizard -- Catalyst module for building wizards',
-    dist_version	=> '0.003',
+    dist_version	=> '0.004',
     recursive_test_files=> 1,
 );
 

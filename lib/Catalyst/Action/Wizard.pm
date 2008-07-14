@@ -78,23 +78,6 @@ sub wizard {
     return _current_wizard($c);
 }
 
-sub _check_wizard_is_changed {
-    my $c = shift;
-    my $wizard_id_without_step = shift;
-
-    my $wizard_id_changed = _current_wizard($c) && $c->can('req');
-
-    $wizard_id_changed &&= 
-	    exists ($c->req->params->{wid})
-	&&   
-	    _current_wizard( $c )->{wizard_id} ne $wizard_id_without_step;
-
-
-    if ( $wizard_id_changed ) { 
-	_current_wizard($c, '');
-    }
-}
-
 sub execute {
     my $self = shift;
     my ($controller, $c) = @_;
@@ -112,12 +95,6 @@ sub execute {
 	if ( $wizard_id ) {
 	    ($wizard_id_without_step) = $wizard_id =~ /([0-9a-zA-Z]{32})/;
 	}
-
-	#if ( $wizard_id && !$wizard_id_without_step ) {
-	#   return $self->next::method( @_ );
-	#}
-
-	#_check_wizard_is_changed( $c, $wizard_id_without_step );
 
 	if ( $wizard_id && $wizard_id_without_step ) {
 	    _new_wizard( $c, $wizard_id );
