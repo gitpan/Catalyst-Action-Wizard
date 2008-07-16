@@ -19,14 +19,18 @@ use strict;
 use warnings;
 use lib qw(t/01plain/lib);
 
-use Test::More tests => 3;
+use Test::More tests => 9;
+use Wizard::Test;
 
 use Catalyst::Wizard;
+use Catalyst::Action::Wizard;
 use Data::Dumper;
-use Filter::Simple;
+
 use Digest::MD5 qw(md5_hex);
 
-use Wizard::Test;
+#---------------------------------------------------------------------------
+#  INIT
+#---------------------------------------------------------------------------
 
 $Data::Dumper::Indent = 1;
 
@@ -44,6 +48,11 @@ get_caller;
 
 like ( $@, qr/-last should be last in/, 'error ok');
 
+
+#---------------------------------------------------------------------------
+#  laststep test
+#---------------------------------------------------------------------------
+
 $new_wizard->add_steps('/testme', -last => '/laststep');
 is_deeply( $new_wizard->{steps}[1], 
     {
@@ -57,4 +66,23 @@ is_deeply( $new_wizard->{steps}[1],
 
 $new_wizard->add_steps(-last => '/laststep');
 is( @{ $new_wizard->{steps} }, 2, 'steps count -- no -last step added');
+
+
+
+#---------------------------------------------------------------------------
+#  Fake wizard (-last => -redirect)
+#---------------------------------------------------------------------------
+
+
+
+
+add_expected('TestApp::wizard_storage', $c, 'current', undef); #_current_wizard
+my $fake_wizard = Catalyst::Action::Wizard->wizard( $c, -last => -redirect => '/test' );
+
+isa_ok( $fake_wizard, 'Catalyst::FakeWizard', 'fake wizard object' );
+is_deeply( $fake_wizard, [ $c, 'redirect', '/test' ], 'fake wizard data');
+
+
+add_expected('PseudoCatalyst::Response::redirect', '/test'); #->res->redirect
+$fake_wizard->goto_next;
 

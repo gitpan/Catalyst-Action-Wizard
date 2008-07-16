@@ -23,7 +23,7 @@ use Test::More tests => 18;
 
 use Catalyst::Wizard;
 use Data::Dumper;
-use Filter::Simple;
+
 use Digest::MD5 qw(md5_hex);
 
 use Wizard::Test;

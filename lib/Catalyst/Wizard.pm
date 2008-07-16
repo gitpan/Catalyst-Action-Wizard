@@ -860,4 +860,24 @@ sub short_info {
     $self->info( @_ );
 }
 
+package # hide from PAUSE
+    Catalyst::FakeWizard;
+
+sub goto_next {
+    my $self = shift;
+
+    my $c	  = $self->[0];
+    my $step_type = $self->[1];
+    my $path	  = $self->[2];
+
+    if ( $step_type eq 'detach' or $step_type eq 'forward' ) {
+	return $c->$step_type( $path );
+    }
+
+    return $c->response->redirect( $path );
+}
+
+sub AUTOLOAD {
+}
+
 1;

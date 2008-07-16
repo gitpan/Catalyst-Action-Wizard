@@ -38,7 +38,7 @@ use Scalar::Util;
 use Data::Dumper;
 use base 'Catalyst::Action';
 
-our $VERSION = '0.001';
+our $VERSION = '0.005';
 
 sub refaddr($) {
     sprintf "%x", Scalar::Util::refaddr(shift);
@@ -62,17 +62,87 @@ sub _new_wizard {
     _current_wizard($c, $class->new( $c, $wizard_id ) );
 }
 
+sub _dont_create_if_empty {
+    my $c = shift;
+    my $caller_pkg = shift;
+
+    # check if not creating wizard in this caller package
+    if ( my $re = $c->config->{wizard}{_ignore_empty_wizard_call_pkg_re} ) {
+	return 1 if $caller_pkg =~ $re;
+	return;
+    }
+
+    return unless exists $c->config->{wizard}{ignore_empty_wizard_call_pkg};
+
+    my $config = $c->config->{wizard}{ignore_empty_wizard_call_pkg};
+
+    return unless ref $config  eq 'ARRAY';
+
+    my @prefixes = grep { m/::$/o } @$config;
+    my @packages = grep { m/\w$/o } @$config;
+
+    my @regexp;
+
+    if ( @packages ) {
+	push @regexp, '^(?:'.join ('|', @packages).')$';
+    }
+
+    if ( @prefixes ) {
+	push @regexp, '^(?:'.join ('|', @prefixes).')';
+    }
+
+    my $regexp = join '|', @regexp;
+
+    $regexp = qr/$regexp/o;
+
+    $c->config->{wizard}{_ignore_empty_wizard_call_pkg_re} = $regexp;
+
+    # pass thru
+    return _dont_create_if_empty( $c, $caller_pkg );
+}
+
 sub wizard {
     my $self	= shift;
     my $c	= shift;
 
     if ( @_ ) { 
 
+	if (	! _current_wizard( $c ) 
+	    &&	$_[0] eq '-last' 
+	    && (
+			@_ == 3 
+		    ||	@_ == 2 
+	        ) ) {
+	    shift;
+
+	    my $step_type = 'redirect';
+
+	    if ( @_ == 2 ) {
+		$step_type = shift;
+		$step_type =~ s/^-//g;
+
+		if ( $step_type !~ m/redirect|detach|forward/ ) {
+		    die "Unknown step type: $step_type";
+		}
+	    }
+
+	    my $path = shift;
+
+	    my $fake_wizard = [ $c, $step_type, $path ];
+
+	    bless $fake_wizard, 'Catalyst::FakeWizard';
+
+	    return $fake_wizard;
+	}
+
 	if ( !_current_wizard( $c ) ) {
 	    _new_wizard( $c );
 	}
 
 	_current_wizard($c)->add_steps(caller => [ caller ], @_);
+    } elsif(	! _current_wizard( $c ) 
+	    &&	_dont_create_if_empty( $c, caller() ) ) {
+	return bless \(my $a = ''), 'Catalyst::FakeWizard';
     }
 
     return _current_wizard($c);
@@ -124,7 +194,7 @@ sub execute {
 	    die $@;
 	}
 
-	return @ret;
+	return wantarray ? @ret : $ret[0];
     } elsif ( $self->name eq '_END' ) {
 	if ( _current_wizard( $c ) ) {
 	    _current_wizard( $c )->save( $c );
