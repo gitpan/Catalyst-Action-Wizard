@@ -8,15 +8,70 @@
 #         BUGS:  ---
 #        NOTES:  ---
 #       AUTHOR:  Pavel Boldin (), <davinchi@cpan.ru>
-#      COMPANY:  
-#      VERSION:  1.0
-#      CREATED:  21.06.2008 19:55:33 MSD
+#      COMPANY:  #      VERSION:  1.0 #      CREATED:  21.06.2008 19:55:33 MSD
 #     REVISION:  ---
 #===============================================================================
 
-=head1 DESCRIPTION
+=head1 NAME
 
 This plugin provides same functionallity like Catalyst::Plugin::Wizard but in some more flexible and correct way.
+
+=head1 SYNOPSIS
+
+
+Plain:
+
+    # create new wizard
+    my $wizard = Catalyst::Wizard->new( $c ); 
+
+    # add steps for that wizard
+    $wizard->add_steps( -detach => '/user/login', '/user/login_submit' );
+    $wizard->add_steps( -last => -redirect => '/user/logout' );
+
+    # mark step to go to next step after this action
+    $wizard->goto_next;
+
+    # perform step (calls redirect/detach/forward/whatever)
+    $wizard->perform_step;
+
+
+With Catalyst::Action::Wizard and CatalystX::Wizarded:
+
+    # just appending step
+    $c->wizard( '/append_this_step' );
+
+    # just marking as goto_next
+    # NOTE: wizards can either 'die' after this (like in detach)
+    # or just mark wizard as 'goto_next'
+    $c->wizard->goto_next;
+
+    # adding -last action in wizard (only one added, other 
+    # '-last' actions ignored). synonym for -default in C::P::W
+    $c->wizard( -last => -redirect => '/logout' )->goto_next;
+
+    # make step back (in case some errors happen)
+    $c->wizard->back_to( -redirect => '/append_this_step' );
+
+    # stash into wizard
+    my $wizard_stash = $c->wizard->stash;
+    $wizard_stash->{parameters} = { %{ $c->req->params } };
+
+    if ( $c->have_wizard ) {
+	$c->wizard->goto_next;
+    }
+
+In TT:
+    [% c.wizard.id_to_form IF c.have_wizard %]
+
+    [%	# INCORRECT! may (and will) cause errors!
+	c.wizard.id_to_form %]
+
+In real application: 
+    See L<there|CatalystX::Wizarded>.
+
+=head1 DESCRIPTION
+
+This module is for general wizard'ed actions. It may be used with CatalystX::Wizarded and along in separate realization (for example in Controller base)
 
 You can use it for creating mulitpart actions (wizards) in following cases:
 
@@ -28,7 +83,7 @@ When you need to move some items into another folder, you may:
 
 =over 4
 
-=item * 
+=item *
 keep current folders select in session (can have difficulties with duplicate selecting of same folder)
 
 =item *
@@ -37,6 +92,7 @@ use it as wizard and keep that info in wizard's stash
 =back
 
 =back
+
 
 =cut
 
@@ -52,26 +108,21 @@ use Carp qw/cluck/;
 
 use Scalar::Util;
 
-our $GOTO_NEXT = "wizard_goto_next\n";
-
-
-
-sub refaddr($) {
-    sprintf "%x", Scalar::Util::refaddr(shift);
-}
 
 use constant DEBUG => $ENV{CATALYST_WIZARD_DEBUG} || 0;
+
 
 if (DEBUG) {
     require Carp;
     Carp->import qw/carp cluck/;
 }
 
-
-
 sub DEBUG2 {
     DEBUG >= 2;
 }
+
+
+our $GOTO_NEXT = "wizard_goto_next\n";
 
 
 
@@ -84,8 +135,15 @@ sub _dump {
 #  Main object functions
 #---------------------------------------------------------------------------
 
+=head1 METHODS
 
+=head2 new($c [, $wizard_id ])
 
+Create wizard object, either new (empty, missing or equal to 'new' C<$wizard_id>)  or loaded from Catalyst::Wizard::wizard_storage.
+
+Note that C<$wizard_id> can also contain step number (splited from wizard_id by C<_>).
+
+=cut
 
 sub new {
     my $class = shift;
@@ -149,19 +207,42 @@ sub _create_wizard_id {
 #---------------------------------------------------------------------------
 
 sub _is_force_add_step {
-    $_[3]->{-force};
+    $_[4]->{-force};
 }
 
 sub _check_flags {
-    my (undef, $args, undef, $flags) = @_;
+    my (undef, $args, $new_steps, undef, $flags) = @_;
     if ( $flags->{-last} && @$args ) {
 	die "-last should be last in ->wizard call";
+    }
+
+    if ( $flags->{-skip} && @$new_steps && ! exists $new_steps->[-1]{skip} ) {
+	die "-skip'ed steps should be first in ->wizard call";
     }
 }
 
 sub _get_default_flags {
-    return { -force => 0, -last => 0 };
+    return { -force => 0, -last => 0, -skip => 0 };
 }
+
+=for api
+
+Making steps from input of @args, passed from add_steps.
+You can redefine following functions to make it behave different:
+
+$self->_get_default_flags 
+    returns default flags
+
+$self->_check_flags( \@args, \@new_steps, $step_ref, $flags )
+    to check flags
+
+$self->_is_force_add_step( \@args, \@new_steps, $step_ref, $flags )
+    should return true if step should added with force (e.g. even if same already exists)
+
+$self->_handle_$1_item( \@args, $step_ref, $flags )
+    to handle '-$1' items in \@args
+
+=cut
 
 sub _make_steps {
     my $self = shift;
@@ -196,6 +277,10 @@ sub _make_steps {
 
 	if ( $flags->{-last} ) {
 	    $step_ref->{last} = 1;
+	}
+
+	if ( $flags->{-skip} ) {
+	    $step_ref->{skip} = 1;
 	}
 
 	if ( $step eq '-forward' || $step eq '-detach' ) {
@@ -252,14 +337,15 @@ sub _make_steps {
 	    next unless $self->$step_type( \@args, $step_ref, $flags );
 	} 
 
-	$self->_check_flags( \@args, $step_ref, $flags );
+	$self->_check_flags( \@args, \@new_steps, $step_ref, $flags );
 
 	$step_ref->{caller} = $caller;
 	$step_ref->{hash}	= md5_hex(_dump($step_ref));
 
 	DEBUG2 && $self->info(qq/step is @{[ _dump($step_ref) ]}\n/);
 
-	if (	$self->_is_force_add_step( \@args, $step_ref, $flags )
+	if (	$self->_is_force_add_step(  \@args, \@new_steps, 
+					    $step_ref, $flags )
 	    ||	!exists $self->{steps_already_in_wizard}{ $step_ref->{hash} } ) {
 
 	    push @new_steps, $step_ref;
@@ -294,6 +380,18 @@ sub _check_last_step {
     $self->_add_to_steps_already_in_wizard( [ $check_for_last_step ] );
 }
 
+sub _check_skip_steps {
+    my $self	    = shift;
+    my $new_steps   = shift;
+
+    # dont skip if some steps remaining
+    return if ( $self->{step_number} > @{ $self->{steps} } );
+
+    my $skip_count = grep { delete $_->{skip} } @$new_steps;
+
+    $self->next_step( $skip_count );
+}
+
 sub _add_to_steps_already_in_wizard {
     my $self = shift;
     my $new_steps = shift;
@@ -303,6 +401,34 @@ sub _add_to_steps_already_in_wizard {
     }
 }
 
+
+=head2 $wizard->add_steps( @args )
+
+Add steps from @args.
+
+@args is an array of path for steps with specification of each step:
+
+=over 3
+
+=item I<< (-redirect => 'path') >> or I<'path'>
+
+Redirect to path. If '-redirect' is given, then no action wizard id will 
+be append to the redirect URL. Use this for last actions in wizard.
+
+You can append any query parameters to 'path'.
+
+=item I<< (-detach => [ 'path', @step_args ]) >> or I<< (-detach => 'path') >>
+
+Detaches to path.
+
+
+=item I<< -last => B<[ -forward | -detach | -redirect ]> => 'path' >>
+
+Last step in wizard. Only one (first) '-last' step will be added, all others will be ignored. Note that -last =>  step should be last in ->add_steps call, elsewhere add_steps will throw exception.
+
+=back
+
+=cut
 
 sub add_steps {
     my $self = shift;
@@ -315,28 +441,11 @@ sub add_steps {
 
     splice @{ $self->{steps} }, $self->{step_number}, 0, @new_steps;
     $self->_add_to_steps_already_in_wizard( \@new_steps );
+
+    $self->_check_skip_steps( \@new_steps );
 }
 
 
-
-=head1
-sub append_step {
-    my $self = shift;
-
-    return if $self->{no_add_step};
-
-    if ( $self->{steps}[-1] && $self->{steps}[-1]->{last} ) {
-	warn "trying to append after last";
-    }
-
-    my @new_steps = $self->_make_steps( caller => [ caller ], @_ );
-
-    $self->_check_last_step( \@new_steps );
-
-    push @{ $self->{steps} }, @new_steps;
-    $self->_add_to_steps_already_in_wizard( \@new_steps );
-}
-=cut
 
 #---------------------------------------------------------------------------
 #  STEP FLOW FUNCTIONS
@@ -361,6 +470,12 @@ sub _step {
 }
 
 
+=head2 $wizard->next_step(I<[ $shift_count ]>)
+
+Shift $shift_count steps, or 1 if no $shift_count is given.
+
+=cut
+
 
 sub next_step {
     my $self = shift;
@@ -372,6 +487,11 @@ sub next_step {
 }
 
 
+#===  FUNCTION  ================================================================
+#         NAME:  _step_back
+#      PURPOSE:  Makes step back.
+#     COMMENTS:  none
+#===============================================================================
 
 sub _step_back {
     my $self	    = shift;
@@ -381,7 +501,7 @@ sub _step_back {
     
     my $step_to_go;
 
-#    $self->info _dump($self, $step_back), " ";
+    DEBUG && $self->info(_dump($step_back));
 
     my $i;
     for($i = $self->{step_number} - 1; $i >= 0; $i--) {
@@ -407,12 +527,17 @@ sub _step_back {
     $step_back = \%step_back;
 
     # to the next of current step
-    $self->{step_number} = $i + 1;
+    $self->{step_number} = $i; # + 1;
 
 
     return $step_back;
 }
 
+=head2 $wizard->uri_for_next 
+
+Returns URI for next step in wizard (if that step is '-redirect').
+
+=cut
 
 
 sub uri_for_next {
@@ -452,6 +577,13 @@ sub _mark_goto {
 }
 
 
+=head2 $wizard->goto_next
+
+Mark wizard step to be performed.
+
+If $wizard->{die_for_goto} is true will act like detach, throwing $GOTO_NEXT exception.
+
+=cut
 
 sub goto_next {
     my $self = shift;
@@ -463,7 +595,13 @@ sub goto_next {
     return;
 }
 
+=head2 $wizard->back_to( B<< [ -redirect | -detach | -forward => ] >> 'path' )
 
+Return to step 'path' which will be performed by original step type or by step type you set as argument.
+
+Will do nothing if none 'path' step if found.
+
+=cut
 
 sub back_to {
     my $self = shift;
@@ -498,6 +636,12 @@ sub back_to {
 }
 
 
+=head2 $wizard->perform_step( $c )
+
+Perform step. Function to call when step performing should be done.
+(called, for instance, in Catalyst::Action::Wizard _END)
+
+=cut
 
 sub perform_step {
     my $self	    = shift;
@@ -675,6 +819,12 @@ sub _force_dont_step_back {
 }
 
 
+=head2 $wizard->stash
+
+Stash accessor.
+
+=cut
+
 
 sub stash {
     shift->{stash};
@@ -694,10 +844,15 @@ sub _get_wizard_id {
 }
 
 
+=head2 $wizard->id_to_form
+
+Get wizard id as <input> tag for <FORM>.
+
+=cut
+
 
 sub id_to_form {
     my $self = shift;
-    my $next = '';
 
     if ($self->{steps}[ $self->{step_number} ]->{uri_for_next}) {
 	return 
@@ -715,6 +870,12 @@ sub id_to_form {
 #---------------------------------------------------------------------------
 #  LOAD/SAVE AND STORAGES
 #---------------------------------------------------------------------------
+
+=head2 $wizard->load( $c )
+
+Loads wizard (by default just installs stash).
+
+=cut
 
 
 sub load {
@@ -741,6 +902,15 @@ sub load {
     #}
 }
 
+=head2 $wizard->save( $c )
+
+Save wizard into wizard_storage.
+
+If $c have B<wizard_storage> it will be called with two arguments: wizard id and wizard instance.
+
+Elsewhere default (session) storage will be used.
+
+=cut
 
 sub save {
     my ( $self, $c ) = @_;
@@ -773,6 +943,16 @@ sub save {
     $storage->{_wizards}{$wizard_id} = $self;
 }
 
+
+=head2 Catalyst::Wizard->wizard_storage( $c, $wizard_id )
+
+Loads $wizard_id from wizard_storage, if can.
+
+First checked if $c can 'wizard_storage'. If yes -- it will be called, else default (session) storage will be used.
+
+Note also that this functions purges old wizards in session.
+
+=cut
 
 
 sub wizard_storage {
@@ -833,6 +1013,20 @@ sub _dump_self {
 }
 
 
+sub refaddr($) {
+    sprintf "%x", Scalar::Util::refaddr(shift);
+}
+
+=head2 $wizard->info and $wizard->short_info
+
+Prints current wizard info.
+
+short_info omits steps on print.
+
+Note that info will skip all the inherited methods ($self->SUPER::info call).
+
+=cut
+
 
 sub info {
     my $self = shift;
@@ -852,13 +1046,24 @@ sub info {
 }
 
 
-
 sub short_info {
     my $self = shift;
     local $self->{steps} = '...skipped...';
 
     $self->info( @_ );
 }
+
+=head1 SEE ALSO
+
+L<Catalyst::Plugin::Continuation>, L<Catalyst Plugin Wizard (DEPRECATED)|Catalyst::Plugin::Wizard>
+
+=cut
+
+=head1 AUTHOR
+
+Pavel Boldin <davinchi@cpan.org> for REG.RU.
+
+=cut
 
 package # hide from PAUSE
     Catalyst::FakeWizard;

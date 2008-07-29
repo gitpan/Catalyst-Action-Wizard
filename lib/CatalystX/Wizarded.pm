@@ -35,7 +35,8 @@ sub have_wizard {
 
 sub import {
     my $self = shift;
-    Catalyst::Controller->_action_class('Catalyst::Action::Wizard');
+    my $action_class = shift || 'Catalyst::Action::Wizard';
+    Catalyst::Controller->_action_class($action_class);
 
     my %defaults = (
 	expires	    => 86400,

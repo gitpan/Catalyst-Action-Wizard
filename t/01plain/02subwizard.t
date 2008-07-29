@@ -30,6 +30,9 @@ use Wizard::Test qw/nolabel/;
 
 Wizard::Test::_get_label_lines($INC{'Catalyst/Wizard.pm'});
 
+# skip ->add_steps in doc
+@$Wizard::Test::label_lines = @$Wizard::Test::label_lines[0,1];
+
 sub get_caller {
     'Catalyst::Wizard:'.$INC{'Catalyst/Wizard.pm'}.':'.
 	(pop @$Wizard::Test::label_lines);
