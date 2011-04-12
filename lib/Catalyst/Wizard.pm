@@ -1,15 +1,13 @@
-#
 #===============================================================================
 #
 #         FILE:  Wizard.pm
-# #  DESCRIPTION:  Catalyst::Wizard
+#  DESCRIPTION:  Catalyst::Wizard
 #
 #        FILES:  ---
 #         BUGS:  ---
 #        NOTES:  ---
 #       AUTHOR:  Pavel Boldin (), <davinchi@cpan.ru>
-#      COMPANY:  #      VERSION:  1.0 #      CREATED:  21.06.2008 19:55:33 MSD
-#     REVISION:  ---
+#      COMPANY:  Domain name registrar http://www.reg.ru/
 #===============================================================================
 
 =head1 NAME
@@ -184,7 +182,7 @@ sub new {
 	    steps_already_in_wizard => {},
 	};
 
-	$self = bless $self, __PACKAGE__;
+	$self = bless $self, $class;
     }
 
 
@@ -858,13 +856,13 @@ sub id_to_form {
 	return 
 	    '<input type="hidden" name="wid" value="' .
 	    $self->_get_wizard_id(1)
-	    . '">'."\n";
+	    . '"/>'."\n";
     }
 
     $self->{"id_to_form"} ||= 
 	'<input type="hidden" name="wid" value="'.
 	$self->_get_wizard_id.
-	'">'."\n";
+	'"/>'."\n";
 }
 
 #---------------------------------------------------------------------------

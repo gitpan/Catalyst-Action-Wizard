@@ -1,18 +1,12 @@
-#
 #===============================================================================
 #
 #         FILE:  Wizard.pm
 #
 #  DESCRIPTION:  Wizarded action.
 #
-#        FILES:  ---
-#         BUGS:  ---
-#        NOTES:  ---
 #       AUTHOR:  Pavel Boldin (), <davinchi@cpan.ru>
-#      COMPANY:  
-#      VERSION:  1.0
+#      COMPANY:  Domain name registrar REG.RU
 #      CREATED:  21.06.2008 19:34:41 MSD
-#     REVISION:  ---
 #===============================================================================
 
 =head1 NAME
@@ -38,7 +32,7 @@ use Scalar::Util;
 use Data::Dumper;
 use base 'Catalyst::Action';
 
-our $VERSION = '0.005';
+our $VERSION = '0.007';
 
 sub refaddr($) {
     sprintf "%x", Scalar::Util::refaddr(shift);
@@ -170,7 +164,13 @@ sub execute {
 	    _new_wizard( $c, $wizard_id );
 	}
 
-    } elsif ( not $self->name =~ /^_/ ) {
+    } elsif ( $self->name eq '_END' ) {
+#	$self->next::method(@_);
+	if ( _current_wizard( $c ) ) {
+	    _current_wizard( $c )->save( $c );
+	}
+#	return;
+    } elsif ( not $self->name =~ /^_(?:ACTION|DISPATCH|AUTO)/ ) {
 
 	my @ret = eval { $self->next::method(@_) };
 
@@ -195,10 +195,6 @@ sub execute {
 	}
 
 	return wantarray ? @ret : $ret[0];
-    } elsif ( $self->name eq '_END' ) {
-	if ( _current_wizard( $c ) ) {
-	    _current_wizard( $c )->save( $c );
-	}
     }
 
     $self->next::method(@_);
