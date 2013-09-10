@@ -1,15 +1,12 @@
-#===============================================================================
-#
-#         FILE:  Wizarded.pm
-#
-#  DESCRIPTION:  Wizarded applications base class
-#
-#        FILES:  ---
-#         BUGS:  ---
-#        NOTES:  ---
-#       AUTHOR:  Pavel Boldin (), <davinchi@cpan.ru>
-#      CREATED:  25.06.2008 14:20:31 MSD
-#===============================================================================
+=head1 NAME
+
+CatalystX::Wizarded
+
+=head1 AUTHORS
+
+Pavel Boldin (), <davinchi@cpan.ru>
+
+=cut
 
 package CatalystX::Wizarded;
 

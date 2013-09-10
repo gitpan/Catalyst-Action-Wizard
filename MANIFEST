@@ -22,3 +22,4 @@ t/mechanize/lib/WizardTest/ComplexWizardTestApp/Controller/Second.pm
 t/mechanize/lib/WizardTest/WizardTestApp.pm
 t/mechanize/lib/WizardTest/WizardTestApp/Controller/First.pm
 t/mechanize/lib/WizardTest/WizardTestApp/Controller/Second.pm
+META.json
